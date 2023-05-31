@@ -1,30 +1,28 @@
 package org.example;
 
+import org.zeromq.SocketType;
+import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
 public class Main {
     public static void main(String[] args) throws InterruptedException {
-        ZMQ.Context ctx = ZMQ.context(1);
 
-        ZMQ.Socket pub = ctx.socket(ZMQ.PUB);
-        ZMQ.Socket sub = ctx.socket(ZMQ.SUB);
+        try (ZContext context = new ZContext()) {
+            ZMQ.Socket subscriber = context.createSocket(SocketType.SUB);
+            subscriber.connect("tcp://localhost:5564");
+            subscriber.subscribe("".getBytes(ZMQ.CHARSET));
+            ZMQ.Socket publisher = context.createSocket(SocketType.PUB);
+            publisher.bind("tcp://*:5563");
 
-        pub.bind("tcp://*:12347");
-        sub.connect("tcp://localhost:12347");
+            while (!Thread.currentThread().isInterrupted()) {
+                // Read message contents
+                String contents = subscriber.recvStr();
+                System.out.println(contents);
 
-        String topico = "ActorDevolucion:";
-        sub.subscribe(topico);
-
-        // Eliminate slow subscriber problem
-        Thread.sleep(100);
-
-        pub.send("ActorDevolucion: Hello, world!");
-        while(!Thread.currentThread().isInterrupted()){
-            System.out.println("SUB: " + sub.recvStr());
+                publisher.send(contents);
+            }
         }
 
-        sub.close();
-        pub.close();
-        ctx.close();
+
     }
 }
